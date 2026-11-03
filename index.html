@@ -487,11 +487,12 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="common.js?v=20261024sec2"></script>
 <script src="mod-engine.js?v=20261027btn"></script>
 <script src="sec-auth.js?v=20261024sec2"></script>
-<script src="est.js?v=20261103e"></script>
+<script src="est.js?v=20261103f"></script>
 <script src="theme.js?v=20261103a"></script>
 <script src="photo.js?v=20261103b"></script>
 <script src="pb.js?v=20261103b"></script>
-<script src="easy.js?v=20261103a"></script>
+<script src="easy.js?v=20261103b"></script>
+<script src="recv.js?v=20261103a"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -1458,7 +1459,7 @@ function mkTabs(){
   var cats=[];
 
   // ── 공사 (견적·계약) ──
-  if(isA()) cats.push({id:"const",label:"🏗️ 공사",items:[{k:"easy",l:"📱 쉬운 화면"},{k:"est",l:"견적·계약"},{k:"photo",l:"현장사진·보고서"}]});
+  if(isA()) cats.push({id:"const",label:"🏗️ 공사",items:[{k:"easy",l:"📱 쉬운 화면"},{k:"est",l:"견적·계약"},{k:"photo",l:"현장사진·보고서"},{k:"recv",l:"💸 받을 돈"}]});
   // 📱 쉬운 화면을 쓰던 사람은 다음에 열 때도 쉬운 화면으로
   if(!window.__ezInit && isA()){ window.__ezInit=1; try{ if(localStorage.getItem("hs_easy")==="1") { CTAB="easy"; _curCat="const"; } }catch(e){} }
 
@@ -5994,6 +5995,7 @@ function draw(){
   else if(CTAB=="theme")el.innerHTML=dTheme();
   else if(CTAB=="photo")el.innerHTML=dPhoto();
   else if(CTAB=="easy")el.innerHTML=dEasy();
+  else if(CTAB=="recv")el.innerHTML=dRecv();
   else if(CTAB=="dash")el.innerHTML=dDash();
   else if(CTAB=="act")el.innerHTML=dAct();
   else if(CTAB=="pur")el.innerHTML=dPur();

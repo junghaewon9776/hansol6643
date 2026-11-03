@@ -29,6 +29,7 @@ function _estLoad(){
   EST_LOADING = true;
   Promise.all([_estRef().once("value"), fbDb.ref("/main/Companies").once("value"), fbDb.ref("/main/Clients").once("value")]).then(function(r){
     EST_LOADING = false; EST = r[0].val() || {}; COMPS = r[1].val() || {}; CLIENTS = r[2].val() || {}; EST_EVT = ev;
+    if(EST_CUR && !EST[EST_CUR]) EST_CUR = "";
     if(CTAB === "est" || CTAB === "photo" || CTAB === "easy") draw();
   }).catch(function(e){ EST_LOADING = false; toast("견적 불러오기 실패: " + e.message, true); });
 }
@@ -79,7 +80,7 @@ function _estKor(n){
 // ── 화면 ──
 function dEst(){
   if(!CUR_EVT) return '<div class="card">먼저 위에서 공사를 골라 주세요.</div>';
-  if(EST_EVT !== _estEvt() || !EST){ EST_CUR = ""; EST_ED = null; _estLoad(); return '<div class="card"><div class="mut">📡 견적 불러오는 중...</div></div>'; }
+  if(EST_EVT !== _estEvt() || !EST){ EST_CUR = window.__estOpen || ""; window.__estOpen = ""; EST_ED = null; _estLoad(); return '<div class="card"><div class="mut">📡 견적 불러오는 중...</div></div>'; }
   if(typeof PB_VIEW !== "undefined" && PB_VIEW && !EST_ED) return dPriceBook();
   if(EST_ED) return _estEditor();
   if(EST_CUR && EST[EST_CUR]) return _estDetail(EST_CUR);
@@ -309,6 +310,7 @@ function _estDetail(id){
   h += '</div>';
 
   // 내역 미리보기
+  if(typeof _rcvBox === "function") h += _rcvBox(id);   // 💵 받은 돈 (계약된 견적)
   h += '<div class="card"><strong>📋 내역</strong><div style="overflow-x:auto;margin-top:8px">' + _estItemsTable(e, false) + '</div><div style="margin-top:10px">' + _estTotHtml(e) + '</div>' + (e.memo ? '<div style="margin-top:8px;font-size:13px;white-space:pre-wrap;background:#f8fafc;padding:8px;border-radius:6px">' + esc(e.memo) + '</div>' : '') + '</div>';
   return h;
 }
