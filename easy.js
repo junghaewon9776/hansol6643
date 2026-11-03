@@ -75,7 +75,7 @@ async function ezNewEvt(){
   if(!confirm("'" + nm + "' 공사를 새로 만들까요?")) return;
   var id = "H" + todayKST().replace(/-/g, "").slice(2) + Math.random().toString(36).slice(2, 5).toUpperCase();
   showLoading("공사 만드는 중...");
-  var r = await api("addEvent", { evtId: id, nm: nm, yr: todayKST().slice(0, 4), active: true, modules: "budget,purchase,act,mem", note: "📱 쉬운 화면에서 만듦", shareMems: false });
+  var r = await api("addEvent", { evtId: id, nm: nm, yr: todayKST().slice(0, 4), active: true, modules: (CUR_EVT && CUR_EVT.modules) || "budget,purchase,act,mem,est,photo,recv,easy", note: "📱 쉬운 화면에서 만듦", shareMems: false });
   if(!r || !r.ok){ hideLoading(); return toast((r && r.err) || "공사를 못 만들었어요", true); }
   try { await refreshData(false); } catch(e){}
   hideLoading(); EZ.add = ""; EZ.pg = "home"; toast("🏗️ '" + nm + "' 만들었어요");

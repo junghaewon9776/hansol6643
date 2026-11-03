@@ -493,6 +493,7 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="pb.js?v=20261103b"></script>
 <script src="easy.js?v=20261103b"></script>
 <script src="recv.js?v=20261103b"></script>
+<script src="tabperm.js?v=20261103t"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -1458,10 +1459,11 @@ function mkTabs(){
   var HM = _hasModule;
   var cats=[];
 
-  // ── 공사 (견적·계약) ──
-  if(isA()) cats.push({id:"const",label:"🏗️ 공사",items:[{k:"easy",l:"📱 쉬운 화면"},{k:"est",l:"견적·계약"},{k:"photo",l:"현장사진·보고서"},{k:"recv",l:"💸 받을 돈"}]});
+  // ── 견적·계약 묶음 (견적·계약 / 현장사진·보고서 / 받을 돈 / 쉬운 화면) — 공사(행사)관리 '사용 모듈'에서 켜고 끔 ──
+  var _cc = (typeof _constCat === "function") ? _constCat() : null;
+  if(isA() && _cc) cats.push(_cc);
   // 📱 쉬운 화면을 쓰던 사람은 다음에 열 때도 쉬운 화면으로
-  if(!window.__ezInit && isA()){ window.__ezInit=1; try{ if(localStorage.getItem("hs_easy")==="1") { CTAB="easy"; _curCat="const"; } }catch(e){} }
+  if(!window.__ezInit && isA() && _cc && _hasConstMod("easy")){ window.__ezInit=1; try{ if(localStorage.getItem("hs_easy")==="1") { CTAB="easy"; _curCat="const"; } }catch(e){} }
 
   // ── 참가자 ──
   var c1=[];
@@ -1508,6 +1510,7 @@ function mkTabs(){
   if(_isSuperAdmin()) c5.push({k:"linkTabs",l:"🔗 연동 탭"});
   if(ME && (ME.r==="super" || ME.r==="admin")) c5.push({k:"theme",l:"🎨 화면 꾸미기"});
   if(_isSuperAdmin()) c5.push({k:"modMgr",l:"📦 모듈 관리"});
+  if(ME && (ME.r==="super" || ME.r==="admin")) c5.push({k:"tabPerm",l:"🙈 계정별 탭 보기"});
   cats.push({id:"sys",label:"⚙️ 시스템",items:c5});
 
   // ── 커스텀 모듈 탭 ──
@@ -1566,6 +1569,9 @@ function mkTabs(){
       cats = _md ? [{id:"vmod",label:(_md.icon?_md.icon+" ":"")+_md.label,items:[{k:_vt,l:_md.label}]}] : [];
     } else { cats=[]; }
   }
+
+  // 🙈 계정별로 숨긴 탭 빼기 (계정별 탭 보기)
+  if(typeof _tpFilter === "function") cats = _tpFilter(cats);
 
   // _curCat이 유효한 카테고리인지 확인, 아니면 CTAB 기반으로 자동 선택
   var validCat=cats.some(function(c){return c.id===_curCat});
@@ -1645,6 +1651,7 @@ function _tabAllowedByEvt(tab){
     case "bank":                   return _hasModule("fee") || _hasModule("budget");
     case "rental":                 return _hasModule("rental");
     case "files":                  return _hasModule("files");
+    case "est": case "photo": case "recv": case "easy": return _hasConstMod(tab);
     default:                       return true;
   }
 }
@@ -5996,6 +6003,7 @@ function draw(){
   else if(CTAB=="photo")el.innerHTML=dPhoto();
   else if(CTAB=="easy")el.innerHTML=dEasy();
   else if(CTAB=="recv")el.innerHTML=dRecv();
+  else if(CTAB=="tabPerm")el.innerHTML=dTabPerm();
   else if(CTAB=="dash")el.innerHTML=dDash();
   else if(CTAB=="act")el.innerHTML=dAct();
   else if(CTAB=="pur")el.innerHTML=dPur();
@@ -22644,7 +22652,7 @@ function _evtMgrHtml(){
 }
 
 // 전역: 공사에서 활성화 가능한 모든 모듈 — 새 모듈 추가 시 여기만 수정
-var ALL_MODS = ["apply","budget","purchase","act","mem","fee","rental","files","groups","vehicle"];
+var ALL_MODS = ["apply","budget","purchase","act","mem","fee","rental","files","groups","vehicle"].concat(typeof CONST_MODS!=="undefined"?CONST_MODS:[]);
 
 // 공사 추가/수정 팝업
 function saveDriveProxy(){
@@ -22872,7 +22880,7 @@ function moveLinkItem(catIdx, itemIdx, dir){
 
 function popEvtEdit(evtId){
   var isNew = !evtId;
-  var e = isNew ? {evtId:"",nm:"",yr:new Date().getFullYear(),active:true,modules:ALL_MODS.join(","),note:""} :
+  var e = isNew ? {evtId:"",nm:"",yr:new Date().getFullYear(),active:true,modules:(typeof _constDefOn==="function"&&!_constDefOn()?ALL_MODS.filter(function(k){return CONST_MODS.indexOf(k)<0;}):ALL_MODS).join(","),note:""} :
     (EVTMGR.events.filter(function(x){return x.evtId===evtId;})[0] || null);
   if(!e){ toast("공사를 찾을 수 없습니다",true); return; }
   var mods = typeof e.modules==="string" ? e.modules.split(",").map(function(s){return s.trim();}).filter(Boolean) : (e.modules||[]);
@@ -22890,7 +22898,8 @@ function popEvtEdit(evtId){
   var modSection = grpBox("📋 공사 운영",        cb("apply","참가자")    +cb("budget","세입세출")+cb("purchase","구매")+cb("act","활동"))
                  + grpBox("👥 회원 관리",        cb("mem","인원관리")    +cb("fee","💵 회비"))
                  + grpBox("📦 조직 공용",        cb("rental","📦 대여자산")+cb("files","📁 자료실"))
-                 + grpBox("📍 현장 운영",        cb("groups","🏷 조 편성"));
+                 + grpBox("📍 현장 운영",        cb("groups","🏷 조 편성"))
+                 + grpBox("📑 견적·계약 묶음",   cb("est","📑 견적·계약")+cb("photo","📷 현장사진·보고서")+cb("recv","💸 받을 돈")+cb("easy","📱 쉬운 화면"));
   var ssHint = isNew ? '' : '<div class="fr"><label>데이터</label><button type="button" class="btn btn-s" style="background:#10b981;color:#fff" onclick="closePopup();openSheet(\'Mems\')">📊 시트 보기</button></div>';
   var h='<div class="pop-head"><h3>'+(isNew?"➕ 새 공사 추가":"✏️ 공사 수정 — "+esc(e.evtId))+'</h3></div>'
     +'<div style="padding:14px">'
