@@ -26,7 +26,7 @@ function _estLoad(){
   EST_LOADING = true;
   Promise.all([_estRef().once("value"), fbDb.ref("/main/Companies").once("value"), fbDb.ref("/main/Clients").once("value")]).then(function(r){
     EST_LOADING = false; EST = r[0].val() || {}; COMPS = r[1].val() || {}; CLIENTS = r[2].val() || {}; EST_EVT = ev;
-    if(CTAB === "est") draw();
+    if(CTAB === "est" || CTAB === "photo") draw();
   }).catch(function(e){ EST_LOADING = false; toast("견적 불러오기 실패: " + e.message, true); });
 }
 
@@ -278,7 +278,7 @@ function _estDetail(id){
   // 출력
   h += '<div class="card" style="margin-bottom:10px"><strong>🖨️ 뽑기</strong> <span class="mut" style="font-size:12px">인쇄 창에서 <b>PDF로 저장</b>을 고르면 파일로 받을 수 있어요</span>';
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px">';
-  h += '<div style="border:2px solid #2563eb;border-radius:8px;padding:10px"><b>💰 견적서</b><div class="mut" style="font-size:12px;margin:4px 0 8px">공사 내역 · 금액 · 우리 회사 직인</div><div style="display:flex;gap:6px">' + _estBtn("#2563eb", "🖨️ 인쇄/PDF", "estPrintQuote('" + id + "')", "flex:1") + _estBtn("#15803d", "📥 엑셀", "estQuoteExcel('" + id + "')", "flex:1") + '</div></div>';
+  h += '<div style="border:2px solid #2563eb;border-radius:8px;padding:10px"><b>💰 견적서</b><div class="mut" style="font-size:12px;margin:4px 0 8px">공사 내역 · 금액 · 우리 회사 직인</div><div style="display:flex;gap:6px">' + _estBtn("#2563eb", "🖨️ 인쇄/PDF", "estPrintQuote('" + id + "')", "flex:1") + _estBtn("#15803d", "📥 엑셀", "estQuoteExcel('" + id + "')", "flex:1") + '</div>' + _estBtn("#b45309", "📷 현장사진 붙여서 인쇄" + (e.ph && e.ph.length ? " (" + e.ph.length + "장)" : ""), "phQuotePick('" + id + "')", "width:100%;margin-top:6px") + '</div>';
   var ok = st === "계약";
   h += '<div style="border:2px solid ' + (ok ? "#7c3aed" : "#cbd5e1") + ';border-radius:8px;padding:10px"><b>📑 계약서</b><div class="mut" style="font-size:12px;margin:4px 0 8px">' + (ok ? "공사 도급 계약서 (견적 금액 그대로)" : "승인 → 계약서 만들기를 하면 뽑을 수 있어요") + '</div>' + (ok ? _estBtn("#7c3aed", "🖨️ 인쇄/PDF", "estPrintContract('" + id + "')", "width:100%") : "") + '</div>';
   var canStmt = st === "승인" || st === "계약";
@@ -462,9 +462,9 @@ var EST_PCSS = '*{box-sizing:border-box}body{margin:0;font-family:"Malgun Gothic
   '.stamp{position:relative;display:inline-block}.stamp img{position:absolute;left:50%;top:50%;width:52px;height:52px;object-fit:contain;transform:translate(-50%,-50%);opacity:.9}' +
   '.tb{display:flex;justify-content:center;gap:8px;padding:10px;background:#1e293b;position:sticky;top:0}.tb button{padding:8px 18px;font-size:14px;font-weight:700;border:none;border-radius:6px;color:#fff;cursor:pointer}' +
   '@media print{.tb{display:none}.pg{width:auto}}';
-function _estWin(title, body, land){
+function _estWin(title, body, land, css){
   var w = window.open("", "_blank", "width=1000,height=1100"); if(!w){ toast("팝업이 막혔어요 — 팝업 허용 후 다시", true); return; }
-  w.document.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>' + esc(title) + '</title><style>@page{size:A4 ' + (land ? "landscape" : "portrait") + ';margin:10mm}' + EST_PCSS + (land ? '.pg{width:277mm}' : '') + '</style></head><body>' +
+  w.document.write('<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>' + esc(title) + '</title><style>@page{size:A4 ' + (land ? "landscape" : "portrait") + ';margin:10mm}' + EST_PCSS + (land ? '.pg{width:277mm}' : '') + (css || '') + '</style></head><body>' +
     '<div class="tb"><button style="background:#2563eb" onclick="window.print()">🖨️ 인쇄 / PDF 저장</button><button style="background:#475569" onclick="window.close()">닫기</button></div>' + body + '</body></html>');
   w.document.close();
 }
@@ -497,7 +497,7 @@ function _estItemsTable(e, print){
 }
 
 // ── 💰 견적서 인쇄 ──
-function estPrintQuote(id){
+function estPrintQuote(id, extra){   // extra: 뒤에 붙일 쪽 (현장 사진 등 — photo.js)
   var e = EST[id], c = _estCalc(e), cl = e.cl || {}, cp = _estComp(e);
   var b = '<div class="pg"><h1>견 적 서</h1><table class="nb"><tr><td style="width:50%;vertical-align:top;padding-right:4mm">';
   b += '<table class="nb" style="font-size:13px"><tr><td style="width:70px">견적번호</td><td>' + esc(e.no || "") + '</td></tr><tr><td>견적일자</td><td>' + esc(e.dt || "") + '</td></tr>';
@@ -516,7 +516,7 @@ function estPrintQuote(id){
   if(e.memo) b += '<table style="margin-top:3mm"><tr><th style="width:80px">특기사항</th><td style="white-space:pre-wrap">' + esc(e.memo) + '</td></tr></table>';
   if(cp.bank) b += '<div style="margin-top:3mm;font-size:12px">입금 계좌: <b>' + esc(cp.bank) + '</b></div>';
   b += '</div>';
-  _estWin("견적서_" + (e.nm || "") + "_" + (e.no || ""), b, !!e.split);
+  _estWin("견적서_" + (e.nm || "") + "_" + (e.no || ""), b + (extra || ""), !!e.split, extra && typeof PH_PCSS !== "undefined" ? PH_PCSS : "");
 }
 
 // ── 📑 계약서 인쇄 ──

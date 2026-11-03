@@ -487,8 +487,9 @@ label{display:block;font-size:10px;color:#999;margin-bottom:3px}
 <script src="common.js?v=20261024sec2"></script>
 <script src="mod-engine.js?v=20261027btn"></script>
 <script src="sec-auth.js?v=20261024sec2"></script>
-<script src="est.js?v=20261103b"></script>
+<script src="est.js?v=20261103c"></script>
 <script src="theme.js?v=20261103a"></script>
+<script src="photo.js?v=20261103a"></script>
 
 <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="console.warn('XLSX CDN load failed')"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js" onerror="console.warn('xlsx-js-style CDN load failed')"></script>
@@ -1455,7 +1456,7 @@ function mkTabs(){
   var cats=[];
 
   // ── 공사 (견적·계약) ──
-  if(isA()) cats.push({id:"const",label:"🏗️ 공사",items:[{k:"est",l:"견적·계약"}]});
+  if(isA()) cats.push({id:"const",label:"🏗️ 공사",items:[{k:"est",l:"견적·계약"},{k:"photo",l:"현장사진·보고서"}]});
 
   // ── 참가자 ──
   var c1=[];
@@ -5987,6 +5988,7 @@ function draw(){
   else if(CTAB=="apform"){el.innerHTML=dApform();var _rrn=document.getElementById("apf_rrn");if(_rrn)_rrn.addEventListener("input",function(){var v=_rrn.value.replace(/[^\d]/g,"").slice(0,13);if(v.length>6)v=v.slice(0,6)+"-"+v.slice(6);_rrn.value=v;});var _tel=document.getElementById("apf_phone");if(_tel)_tel.addEventListener("input",function(){var v=_tel.value.replace(/[^\d]/g,"").slice(0,11);if(v.length<4)_tel.value=v;else if(v.length<8)_tel.value=v.slice(0,3)+"-"+v.slice(3);else if(v.length<=10)_tel.value=v.slice(0,3)+"-"+v.slice(3,6)+"-"+v.slice(6);else _tel.value=v.slice(0,3)+"-"+v.slice(3,7)+"-"+v.slice(7);});}
   else if(CTAB=="est")el.innerHTML=dEst();
   else if(CTAB=="theme")el.innerHTML=dTheme();
+  else if(CTAB=="photo")el.innerHTML=dPhoto();
   else if(CTAB=="dash")el.innerHTML=dDash();
   else if(CTAB=="act")el.innerHTML=dAct();
   else if(CTAB=="pur")el.innerHTML=dPur();
