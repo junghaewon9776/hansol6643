@@ -7,6 +7,7 @@
 // ============================================================================
 var EST = null, EST_EVT = "", EST_CUR = "", EST_ED = null, COMPS = {}, CLIENTS = {}, EST_LOADING = false;
 var EST_ST = ["작성중","제출","승인","반려","계약"];
+var EST_MEMO = ["1. 상기 금액은 부가가치세가 포함된 금액입니다.", "2. 견적 유효기간은 견적일로부터 30일입니다.", "3. 공사 착수 및 준공일은 계약 시 협의하여 정합니다.", "4. 현장 여건 변경 및 물량 증감 시 정산하여 청구합니다."].join("\n");
 var EST_ST_BG = {"작성중":"#475569","제출":"#2563eb","승인":"#16a34a","반려":"#dc2626","계약":"#7c3aed"};
 
 function _estEvt(){ return (CUR_EVT && CUR_EVT.evtId) || ""; }
@@ -45,8 +46,14 @@ function _estCalc(e){
     return { nm: r.nm || "", mode: r.mode, v: r.v, am: a };
   });
   var pre = d; ext.forEach(function(r){ pre += r.am; });
-  var cutU = _estN(e.cut), sup = cutU > 0 ? Math.floor(pre / cutU) * cutU : pre;
-  var vat = e.vat === false ? 0 : Math.floor(sup / 10);
+  var cutU = _estN(e.cut), sup, vat, tot;
+  if(e.cutTot && cutU > 0 && e.vat !== false){
+    // 총액(부가세 포함)에서 끝자리 버림 → 공급가액·부가세는 총액에서 거꾸로 (공급가액+부가세 = 총액 딱 맞게)
+    tot = Math.floor((pre + Math.floor(pre / 10)) / cutU) * cutU; sup = Math.round(tot / 1.1); vat = tot - sup;
+    return { mat: m, lab: l, exp: x, direct: d, ext: ext, pre: pre, cutAm: sup - pre, sup: sup, vat: vat, tot: tot };
+  }
+  sup = cutU > 0 ? Math.floor(pre / cutU) * cutU : pre;
+  vat = e.vat === false ? 0 : Math.floor(sup / 10);
   return { mat: m, lab: l, exp: x, direct: d, ext: ext, pre: pre, cutAm: sup - pre, sup: sup, vat: vat, tot: sup + vat };
 }
 
@@ -121,7 +128,7 @@ function estNew(){
   EST_ED = { _id: "", no: _estNextNo(), dt: todayKST(), st: "작성중", sup: _estDefComp(), cl: { nm: "", ceo: "", biz: "", addr: "", tel: "" },
     nm: CUR_EVT.nm || "", site: "", valid: "견적일로부터 30일", term: "", split: true,
     items: [{ hd: 1, nm: "1. 공사" }, { nm: "", spec: "", u: "식", qty: 1, mat: 0, lab: 0, exp: 0, note: "" }],
-    ext: [{ nm: "일반관리비", mode: "pct", v: 6 }, { nm: "이윤", mode: "pct", v: 10 }], cut: 1000, vat: true, memo: "" };
+    ext: [], cut: 1000, cutTot: true, vat: true, memo: EST_MEMO };
   draw();
 }
 function estCopy(id){
@@ -195,7 +202,8 @@ function _estEditor(){
   h += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:13px;align-items:center">';
   h += '<label>끝자리 정리 <select onchange="EST_ED.cut=Number(this.value);_estRecalc()" style="padding:5px;border:1px solid #cbd5e1;border-radius:5px">';
   [[0, "그대로"], [100, "100원 미만 버림"], [1000, "1,000원 미만 버림"], [10000, "1만원 미만 버림"], [100000, "10만원 미만 버림"]].forEach(function(o){ h += '<option value="' + o[0] + '"' + (_estN(e.cut) === o[0] ? " selected" : "") + '>' + o[1] + '</option>'; });
-  h += '</select></label><label><input type="checkbox" ' + (e.vat !== false ? "checked" : "") + ' onchange="EST_ED.vat=this.checked;_estRecalc()"> 부가세 10% 더하기</label></div>';
+  h += '</select></label><label><input type="checkbox" ' + (e.cutTot ? "checked" : "") + ' onchange="EST_ED.cutTot=this.checked;_estRecalc()"> 부가세 더한 <b>총액</b>에서 버리기</label>';
+  h += '<label><input type="checkbox" ' + (e.vat !== false ? "checked" : "") + ' onchange="EST_ED.vat=this.checked;_estRecalc()"> 부가세 10% 더하기</label></div>';
   h += '<div id="estTot" style="margin-top:12px">' + _estTotHtml(e) + '</div></div>';
   h += '<div class="card" style="margin-bottom:10px"><strong>📝 특기사항</strong> <span class="mut" style="font-size:12px">(견적서 아래에 찍혀요)</span><textarea onchange="EST_ED.memo=this.value" style="width:100%;min-height:70px;margin-top:6px;padding:8px;border:1px solid #cbd5e1;border-radius:6px;box-sizing:border-box;font-family:inherit">' + esc(e.memo || "") + '</textarea></div>';
   h += '<div style="text-align:right;margin-bottom:20px">' + _estBtn("#16a34a", "💾 저장", "estSave()", "padding:10px 26px;font-size:14px") + '</div>';
