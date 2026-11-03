@@ -21,7 +21,7 @@ function _phLoad(){
   if(EST_EVT !== ev) _estLoad();   // 발주처·계약·업체 정보 (결과보고서 표지용)
   Promise.all([_phRef("meta").once("value"), _phRef("rep").once("value")]).then(function(r){
     PH_LOADING = false; PH = { meta: r[0].val() || {} }; PH_REP = r[1].val() || null; PH_EVT = ev; PH_FULL = {};
-    if(CTAB === "photo") draw();
+    if(CTAB === "photo" || CTAB === "easy") draw();
   }).catch(function(e){ PH_LOADING = false; toast("사진 불러오기 실패: " + e.message, true); });
 }
 function _phFull(ids){

@@ -29,7 +29,7 @@ function _estLoad(){
   EST_LOADING = true;
   Promise.all([_estRef().once("value"), fbDb.ref("/main/Companies").once("value"), fbDb.ref("/main/Clients").once("value")]).then(function(r){
     EST_LOADING = false; EST = r[0].val() || {}; COMPS = r[1].val() || {}; CLIENTS = r[2].val() || {}; EST_EVT = ev;
-    if(CTAB === "est" || CTAB === "photo") draw();
+    if(CTAB === "est" || CTAB === "photo" || CTAB === "easy") draw();
   }).catch(function(e){ EST_LOADING = false; toast("견적 불러오기 실패: " + e.message, true); });
 }
 
@@ -112,7 +112,7 @@ function _estList(){
   ids.forEach(function(id){
     var e = EST[id], c = _estCalc(e), bs = _estStmtSum(e);
     h += '<tr style="cursor:pointer" onclick="EST_CUR=\'' + id + '\';draw()" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'\'">';
-    h += '<td style="padding:8px;border-bottom:1px solid #f1f5f9"><b>' + esc(e.no || "") + '</b></td>';
+    h += '<td style="padding:8px;border-bottom:1px solid #f1f5f9"><b>' + esc(e.no || "") + '</b>' + (e.ez ? '<div style="font-size:11px;color:#b45309;font-weight:700">📱 ' + esc(e.ezBy || '현장') + ' 작성</div>' : '') + '</td>';
     h += '<td style="padding:8px;border-bottom:1px solid #f1f5f9">' + esc(e.dt || "") + '</td>';
     h += '<td style="padding:8px;border-bottom:1px solid #f1f5f9">' + esc(_estComp(e).nm || "") + '</td>';
     h += '<td style="padding:8px;border-bottom:1px solid #f1f5f9">' + esc((e.cl && e.cl.nm) || "") + '</td>';
