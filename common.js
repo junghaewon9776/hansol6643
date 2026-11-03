@@ -1524,7 +1524,7 @@ function _upsertCfgArr(arr, key, value) {
 // ───────── 텔레그램 알림 ─────────
 var TG_BOT_TOKEN = "8761665630:AAGv9FjG4fcxee4hpyjoIjd5wkXm0c-_qV0";
 var TG_CHAT_IDS  = "8613833560";
-var TG_SYS_URL   = "https://junghaewon9776.github.io/hansol-arch/";
+var TG_SYS_URL   = "https://junghaewon9776.github.io/hansol6643/";
 
 
 // 로그인 알림에 붙일 시스템 이름 (SYS_PARENT = 각 시스템 상호/주관)
