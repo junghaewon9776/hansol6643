@@ -90,7 +90,10 @@ function dRecv(){
   [["계약 합계", T.tot, "#334155"], ["청구(거래명세표)", T.billed, "#0f766e"], ["받은 돈", T.got, "#16a34a"], ["남은 돈 (미수)", T.rest, "#dc2626"], ["⏰ 기한 지난 돈", T.late, "#b91c1c"]].forEach(function(c){
     h += '<div style="border:2px solid ' + c[2] + ';border-radius:10px;padding:10px"><div style="font-size:12px;color:' + c[2] + ';font-weight:700">' + c[0] + '</div><div style="font-size:19px;font-weight:900;color:' + c[2] + '">' + _estW(c[1]) + '원</div></div>'; });
   h += '</div></div>';
-  h += '<div class="card" style="margin-bottom:10px;display:flex;gap:6px">';
+  h += '<div class="card" style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap">';
+  [["evt", "🏗️ 공사별"], ["cl", "📒 거래처별 (원장)"]].forEach(function(v){ var on = RCV_VIEW === v[0]; h += '<button class="btn" style="background:' + (on ? "#7c4a21" : "#e7e5e4") + ';color:' + (on ? "#fff" : "#292524") + ';padding:8px 16px;font-size:13px" onclick="RCV_VIEW=\'' + v[0] + '\';draw()">' + v[1] + '</button>'; });
+  if(RCV_VIEW === "cl") return h + '</div>' + _rcvClientView();
+  h += '<span style="width:14px"></span>';
   [["due", "남은 돈 있는 것만"], ["all", "전부"]].forEach(function(v){ var on = RCV_FILT === v[0]; h += '<button class="btn" style="background:' + (on ? "#292524" : "#e7e5e4") + ';color:' + (on ? "#fff" : "#292524") + '" onclick="RCV_FILT=\'' + v[0] + '\';draw()">' + v[1] + '</button>'; });
   h += '</div><div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:860px"><thead><tr style="background:#f1f5f9">';
   ["고객 (발주처)", "공사", "업체", "계약 금액", "받은 돈", "남은 돈", "다음에 받을 것", ""].forEach(function(t, i){ h += '<th style="padding:8px;text-align:' + (i >= 3 && i <= 5 ? "right" : "left") + '">' + t + '</th>'; });
@@ -111,4 +114,79 @@ async function rcvOpen(evtId, id){
   CTAB = "est"; EST_ED = null; if(typeof PB_VIEW !== "undefined") PB_VIEW = false;
   if(EST_EVT !== evtId || !EST){ EST = null; window.__estOpen = id; } else EST_CUR = id;   // 견적 다 받은 뒤 그 견적을 열게
   mkTabs(); draw();
+}
+
+// ============================================================================
+// 📒 거래처원장 — 고객(발주처)별 계약 합계·받은 돈·잔금 + 날짜순 원장(계약 → 입금, 잔액)
+// ============================================================================
+var RCV_VIEW = "evt", RCV_YR = "", RCV_CL = "";
+function _rcvQ(s){ return esc(s).replace(/'/g, "\\'"); }
+function _rcvYrs(){ var y = {}; (RCV_ALL || []).forEach(function(x){ var d = String((x.e.ct && x.e.ct.dt) || x.e.dt || "").slice(0, 4); if(d) y[d] = 1; }); return Object.keys(y).sort().reverse(); }
+function _rcvInYr(x){ return !RCV_YR || String((x.e.ct && x.e.ct.dt) || x.e.dt || "").slice(0, 4) === RCV_YR; }
+function _rcvClients(){
+  var m = {};
+  (RCV_ALL || []).filter(_rcvInYr).forEach(function(x){
+    var nm = String((x.e.cl && x.e.cl.nm) || "(이름 없음)").trim(), c = m[nm] || (m[nm] = { nm: nm, n: 0, tot: 0, billed: 0, got: 0, rest: 0, last: "", late: 0, list: [] });
+    c.n++; c.tot += x.P.tot; c.billed += x.P.billed; c.got += x.P.got; c.rest += Math.max(0, x.P.rest); c.list.push(x);
+    Object.keys(x.e.rcv || {}).forEach(function(k){ var d = x.e.rcv[k].dt || ""; if(d > c.last) c.last = d; });
+    x.P.steps.forEach(function(s){ if(s.late) c.late += s.am - s.paid; });
+  });
+  return Object.keys(m).map(function(k){ return m[k]; }).sort(function(a, b){ return b.rest - a.rest || b.tot - a.tot; });
+}
+// 원장 줄: 계약(받을 돈 생김) + 입금(받음) → 날짜순, 줄마다 잔액
+function _rcvLedger(c){
+  var L = [];
+  c.list.forEach(function(x){
+    var ct = x.e.ct || {};
+    L.push({ dt: ct.dt || x.e.dt || "", what: "공사 계약" + (ct.st || ct.en ? " (" + (ct.st || "") + " ~ " + (ct.en || "") + ")" : ""), evt: x.ev.nm || x.e.nm || "", up: x.P.tot, down: 0 });
+    Object.keys(x.e.rcv || {}).forEach(function(k){ var r = x.e.rcv[k]; L.push({ dt: r.dt || "", what: (r.kind || "입금") + " 받음" + (r.how ? " · " + r.how : "") + (r.memo ? " · " + r.memo : ""), evt: x.ev.nm || x.e.nm || "", up: 0, down: _estN(r.am) }); });
+  });
+  L.sort(function(a, b){ return String(a.dt).localeCompare(String(b.dt)) || (b.up - a.up); });
+  var bal = 0; L.forEach(function(r){ bal += r.up - r.down; r.bal = bal; });
+  return L;
+}
+function _rcvLedgerTable(c, print){
+  var L = _rcvLedger(c), S = print ? "" : "padding:7px;border-bottom:1px solid #f1f5f9;";
+  var h = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr' + (print ? "" : ' style="background:#f1f5f9"') + '><th style="' + S + 'text-align:left">날짜</th><th style="' + S + 'text-align:left">내용</th><th style="' + S + 'text-align:left">공사</th><th style="' + S + 'text-align:right">계약 (받을 돈)</th><th style="' + S + 'text-align:right">입금 (받은 돈)</th><th style="' + S + 'text-align:right">잔액</th></tr></thead><tbody>';
+  L.forEach(function(r){ h += '<tr><td style="' + S + '">' + esc(r.dt) + '</td><td style="' + S + '">' + esc(r.what) + '</td><td style="' + S + '">' + esc(r.evt) + '</td><td style="' + S + 'text-align:right">' + (r.up ? _estW(r.up) : "") + '</td><td style="' + S + 'text-align:right;color:#16a34a">' + (r.down ? _estW(r.down) : "") + '</td><td style="' + S + 'text-align:right;font-weight:800">' + _estW(r.bal) + '</td></tr>'; });
+  h += '<tr style="font-weight:900"><td colspan="3" style="' + S + 'text-align:center">합 계</td><td style="' + S + 'text-align:right">' + _estW(c.tot) + '</td><td style="' + S + 'text-align:right;color:#16a34a">' + _estW(c.got) + '</td><td style="' + S + 'text-align:right;color:#dc2626">' + _estW(c.tot - c.got) + '</td></tr></tbody></table>';
+  return h;
+}
+function _rcvClientView(){
+  var cs = _rcvClients(), B = _estBtn, yrs = _rcvYrs();
+  var h = '<div class="card" style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b>📅 연도</b><select onchange="RCV_YR=this.value;RCV_CL=\'\';draw()" style="padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px"><option value="">전체</option>' + yrs.map(function(y){ return '<option' + (y === RCV_YR ? " selected" : "") + '>' + y + '</option>'; }).join("") + '</select><span class="mut" style="font-size:12px">(계약일 기준)</span><span style="margin-left:auto">' + B("#7c4a21", "🖨️ 거래처별 합계 인쇄", "rcvPrint('')") + '</span></div>';
+  if(RCV_CL){
+    var c = cs.filter(function(x){ return x.nm === RCV_CL; })[0];
+    if(c){
+      h += '<div class="card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div>' + B("#475569", "← 거래처 목록", "RCV_CL='';draw()") + ' <strong style="font-size:18px;margin-left:6px">📒 ' + esc(c.nm) + ' 거래처원장</strong></div>' + B("#7c4a21", "🖨️ 인쇄 / PDF", "rcvPrint('" + _rcvQ(c.nm) + "')") + '</div>';
+      h += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin:10px 0;font-size:14px"><div>공사 <b>' + c.n + '건</b></div><div>계약 합계 <b>' + _estW(c.tot) + '</b></div><div>받은 돈 <b style="color:#16a34a">' + _estW(c.got) + '</b></div><div>잔금 <b style="color:#dc2626;font-size:17px">' + _estW(c.rest) + '원</b></div>' + (c.late ? '<div style="color:#b91c1c;font-weight:800">⏰ 기한 지남 ' + _estW(c.late) + '원</div>' : '') + '</div>';
+      return h + '<div style="overflow-x:auto">' + _rcvLedgerTable(c, false) + '</div></div>';
+    }
+    RCV_CL = "";
+  }
+  h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px;min-width:820px"><thead><tr style="background:#f1f5f9">';
+  ["거래처 (고객)", "공사", "계약 합계", "청구", "받은 돈", "잔금", "마지막 입금", ""].forEach(function(t, i){ h += '<th style="padding:8px;text-align:' + (i >= 2 && i <= 5 ? "right" : "left") + '">' + t + '</th>'; });
+  h += '</tr></thead><tbody>';
+  if(!cs.length) h += '<tr><td colspan="8" style="padding:30px;text-align:center;color:#94a3b8">계약된 공사가 없어요</td></tr>';
+  var T = { n: 0, tot: 0, billed: 0, got: 0, rest: 0 };
+  cs.forEach(function(c){ ["n", "tot", "billed", "got", "rest"].forEach(function(k){ T[k] += c[k]; });
+    var go = "RCV_CL='" + _rcvQ(c.nm) + "';draw()";
+    h += '<tr style="border-bottom:1px solid #f1f5f9;cursor:pointer;' + (c.late ? "background:#fef2f2" : "") + '" onclick="' + go + '"><td style="padding:8px;font-weight:800">' + esc(c.nm) + (c.late ? ' <span style="color:#dc2626;font-size:11px">⏰ 기한 지남</span>' : '') + '</td><td style="padding:8px">' + c.n + '건</td><td style="padding:8px;text-align:right">' + _estW(c.tot) + '</td><td style="padding:8px;text-align:right">' + _estW(c.billed) + '</td><td style="padding:8px;text-align:right;color:#16a34a">' + _estW(c.got) + '</td><td style="padding:8px;text-align:right;font-weight:900;color:#dc2626">' + _estW(c.rest) + '</td><td style="padding:8px">' + esc(c.last || "-") + '</td><td style="padding:8px">' + B("#2563eb", "원장", "event.stopPropagation();" + go, "padding:4px 10px") + '</td></tr>'; });
+  if(cs.length) h += '<tr style="background:#fafaf9;font-weight:900"><td style="padding:8px">합계 (' + cs.length + '곳)</td><td style="padding:8px">' + T.n + '건</td><td style="padding:8px;text-align:right">' + _estW(T.tot) + '</td><td style="padding:8px;text-align:right">' + _estW(T.billed) + '</td><td style="padding:8px;text-align:right;color:#16a34a">' + _estW(T.got) + '</td><td style="padding:8px;text-align:right;color:#dc2626">' + _estW(T.rest) + '</td><td colspan="2"></td></tr>';
+  return h + '</tbody></table></div>';
+}
+function rcvPrint(nm){
+  var cs = _rcvClients(), cp = _estComp({}), yr = RCV_YR ? RCV_YR + "년 · " : "", b = '<div class="pg">';
+  if(nm){
+    var c = cs.filter(function(x){ return x.nm === nm; })[0]; if(!c) return;
+    b += '<h1 style="letter-spacing:10px">거 래 처 원 장</h1><table class="nb" style="margin-bottom:3mm;font-size:13px"><tr><td><b style="font-size:16px">' + esc(c.nm) + '</b> 귀하</td><td style="text-align:right">' + yr + '뽑은 날 ' + esc(todayKST()) + '<br>' + esc(cp.nm || "") + '</td></tr></table>';
+    b += _rcvLedgerTable(c, true);
+    b += '<div style="margin-top:4mm;font-size:14px;text-align:right">남은 금액 <b style="font-size:17px">₩' + _estW(c.tot - c.got) + '</b>' + (cp.bank ? '<br><span style="font-size:12px">입금 계좌: ' + esc(cp.bank) + '</span>' : '') + '</div>';
+  } else {
+    b += '<h1 style="letter-spacing:6px">거래처별 공사대금 현황</h1><div style="text-align:right;font-size:12px;margin-bottom:2mm">' + yr + '뽑은 날 ' + esc(todayKST()) + ' · ' + esc(cp.nm || "") + '</div><table><tr><th>거래처</th><th>공사</th><th>계약 합계</th><th>청구</th><th>받은 돈</th><th>잔금</th><th>마지막 입금</th></tr>';
+    var T = { tot: 0, billed: 0, got: 0, rest: 0, n: 0 };
+    cs.forEach(function(c){ T.tot += c.tot; T.billed += c.billed; T.got += c.got; T.rest += c.rest; T.n += c.n; b += '<tr><td>' + esc(c.nm) + '</td><td class="c">' + c.n + '</td><td class="r">' + _estW(c.tot) + '</td><td class="r">' + _estW(c.billed) + '</td><td class="r">' + _estW(c.got) + '</td><td class="r"><b>' + _estW(c.rest) + '</b></td><td class="c">' + esc(c.last || "-") + '</td></tr>'; });
+    b += '<tr style="font-weight:900"><td class="c">합계</td><td class="c">' + T.n + '</td><td class="r">' + _estW(T.tot) + '</td><td class="r">' + _estW(T.billed) + '</td><td class="r">' + _estW(T.got) + '</td><td class="r">' + _estW(T.rest) + '</td><td></td></tr></table>';
+  }
+  _estWin((nm ? "거래처원장_" + nm : "거래처별_공사대금") + "_" + todayKST(), b + '</div>', false);
 }
