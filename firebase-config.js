@@ -1,12 +1,12 @@
-// Firebase 설정 - 한솔건축  ⚠ 새 Firebase 프로젝트를 만든 뒤 아래 값을 채워야 함 (콘솔 → 프로젝트 설정 → 웹 앱)
+// Firebase 설정 - 한솔건축 (hansol6643)
 const firebaseConfig = {
-  apiKey: "여기에",
-  authDomain: "여기에.firebaseapp.com",
-  databaseURL: "https://여기에-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "여기에",
-  storageBucket: "여기에.firebasestorage.app",
-  messagingSenderId: "여기에",
-  appId: "여기에"
+  apiKey: "AIzaSyBt2UQzRIaaDp5OoZnwsGS5HguK-592F-g",
+  authDomain: "hansol6643.firebaseapp.com",
+  databaseURL: "https://hansol6643-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "hansol6643",
+  storageBucket: "hansol6643.firebasestorage.app",
+  messagingSenderId: "484499455925",
+  appId: "1:484499455925:web:0934ff14934d18c4c763fc"
 };
 
 firebase.initializeApp(firebaseConfig);
