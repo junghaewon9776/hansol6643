@@ -7,6 +7,9 @@
 // ============================================================================
 var EST = null, EST_EVT = "", EST_CUR = "", EST_ED = null, COMPS = {}, CLIENTS = {}, EST_LOADING = false;
 var EST_ST = ["작성중","제출","승인","반려","계약"];
+var EST_EXT_MODES = [["pct", "직접공사비의 %"], ["lab", "노무비의 %"], ["ml", "재료비+노무비의 %"], ["prev", "위 금액 합계의 %"], ["amt", "금액(원)"]];
+// 📐 원가계산 기본 줄 — 요율은 해마다 바뀌어서 0 으로 (직접 넣기)
+var EST_COST_ROWS = [{ nm: "간접노무비", mode: "lab", v: 0 }, { nm: "산재보험료", mode: "lab", v: 0 }, { nm: "고용보험료", mode: "lab", v: 0 }, { nm: "안전관리비", mode: "ml", v: 0 }, { nm: "일반관리비", mode: "prev", v: 0 }, { nm: "이윤", mode: "prev", v: 0 }];
 var EST_MEMO = ["1. 상기 금액은 부가가치세가 포함된 금액입니다.", "2. 견적 유효기간은 견적일로부터 30일입니다.", "3. 공사 착수 및 준공일은 계약 시 협의하여 정합니다.", "4. 현장 여건 변경 및 물량 증감 시 정산하여 청구합니다."].join("\n");
 var EST_ST_BG = {"작성중":"#475569","제출":"#2563eb","승인":"#16a34a","반려":"#dc2626","계약":"#7c3aed"};
 
@@ -41,8 +44,11 @@ function _estCalc(e){
     else m += q * _estN(it.mat);
   });
   m = Math.round(m); l = Math.round(l); x = Math.round(x); d = m + l + x;
+  var run = d;   // "위 금액 합계" = 직접공사비 + 앞 줄 제경비
   var ext = (e.ext || []).map(function(r){
-    var a = r.mode === "pct" ? Math.round(d * _estN(r.v) / 100) : Math.round(_estN(r.v));
+    var base = r.mode === "lab" ? l : r.mode === "ml" ? m + l : r.mode === "prev" ? run : d;
+    var a = r.mode === "amt" ? Math.round(_estN(r.v)) : Math.round(base * _estN(r.v) / 100);
+    run += a;
     return { nm: r.nm || "", mode: r.mode, v: r.v, am: a };
   });
   var pre = d; ext.forEach(function(r){ pre += r.am; });
@@ -74,6 +80,7 @@ function _estKor(n){
 function dEst(){
   if(!CUR_EVT) return '<div class="card">먼저 위에서 공사를 골라 주세요.</div>';
   if(EST_EVT !== _estEvt() || !EST){ EST_CUR = ""; EST_ED = null; _estLoad(); return '<div class="card"><div class="mut">📡 견적 불러오는 중...</div></div>'; }
+  if(typeof PB_VIEW !== "undefined" && PB_VIEW && !EST_ED) return dPriceBook();
   if(EST_ED) return _estEditor();
   if(EST_CUR && EST[EST_CUR]) return _estDetail(EST_CUR);
   return _estList();
@@ -89,7 +96,7 @@ function _estList(){
   var ids = Object.keys(EST).sort(function(a, b){ return String(EST[b].dt || "").localeCompare(String(EST[a].dt || "")) || String(EST[b].no || "").localeCompare(String(EST[a].no || "")); });
   var h = '<div class="card" style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">';
   h += '<div><strong style="font-size:18px">🏗️ 견적·계약</strong> <span class="mut" style="font-size:12px;margin-left:6px">' + esc(CUR_EVT.nm || "") + ' — 견적 내기 → 승인 → 계약서 → 거래명세표</span></div>';
-  h += '<div style="display:flex;gap:6px;flex-wrap:wrap">' + _estBtn("#2563eb", "+ 새 견적", "estNew()") + _estBtn("#0f766e", "🏢 견적 내는 업체 (" + _estCompIds().length + ")", "estCompanyList()") + '</div></div>';
+  h += '<div style="display:flex;gap:6px;flex-wrap:wrap">' + _estBtn("#2563eb", "+ 새 견적", "estNew()") + _estBtn("#7c4a21", "📒 단가표 · 세트", "PB_VIEW=true;draw()") + _estBtn("#0f766e", "🏢 견적 내는 업체 (" + _estCompIds().length + ")", "estCompanyList()") + '</div></div>';
   if(!_estCompIds().length) h += '<div style="margin-top:8px;padding:8px 10px;background:#fef3c7;border-radius:6px;font-size:13px;color:#92400e">⚠️ <b>견적 내는 업체</b>(상호·사업자번호·대표자·주소·직인)를 먼저 등록해 두면 견적서·계약서·거래명세표에 자동으로 찍혀요. 사업자가 여러 개거나 다른 업체 이름으로 써 줄 때도 여기 등록해 두고 골라 쓰면 돼요.</div>';
   h += '</div>';
   // 요약
@@ -179,7 +186,7 @@ function _estEditor(){
       return;
     }
     h += '<tr>' + mv;
-    h += '<td ' + T + '>' + _estIn(it.nm, "estIt(" + i + ",'nm',this.value)", "100%") + '</td>';
+    h += '<td ' + T + '><input list="pbDL" value="' + esc(it.nm || "") + '" onchange="estIt(' + i + ',\'nm\',this.value);pbAutoFill(' + i + ',this.value)" placeholder="품명 (단가표 자동완성)" style="width:100%;padding:5px 7px;border:1px solid #cbd5e1;border-radius:5px;box-sizing:border-box"></td>';
     h += '<td ' + T + '>' + _estIn(it.spec, "estIt(" + i + ",'spec',this.value)", "100%") + '</td>';
     h += '<td ' + T + ' style="width:56px">' + _estIn(it.u, "estIt(" + i + ",'u',this.value)", "52px") + '</td>';
     h += '<td ' + T + ' style="width:70px"><input inputmode="decimal" value="' + esc(it.qty == null ? "" : it.qty) + '" oninput="estIt(' + i + ',\'qty\',this.value,1)" style="width:66px;padding:5px;border:1px solid #cbd5e1;border-radius:5px;text-align:right"></td>';
@@ -188,17 +195,17 @@ function _estEditor(){
     h += '<td ' + T + ' style="text-align:right;font-weight:700;white-space:nowrap" id="estAm' + i + '">' + _estW(_estN(it.qty) * (e.split ? _estUnit(it) : _estN(it.mat))) + '</td>';
     h += '<td ' + T + '>' + _estIn(it.note, "estIt(" + i + ",'note',this.value)", "100%") + '</td>' + del + '</tr>';
   });
-  h += '</tbody></table></div><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">' + _estBtn("#2563eb", "+ 항목 줄", "estAdd(0)") + _estBtn("#1e40af", "+ 공종 제목 줄", "estAdd(1)") + '</div></div>';
+  h += '</tbody></table></div><div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">' + _estBtn("#7c4a21", "📒 단가표에서 넣기", "pbPick()") + _estBtn("#b45309", "📐 세트로 넣기 (면적만 넣으면 계산)", "pbSetPick()") + _estBtn("#2563eb", "+ 항목 줄", "estAdd(0)") + _estBtn("#1e40af", "+ 공종 제목 줄", "estAdd(1)") + _estBtn("#475569", "💾 이 견적 단가를 단가표에 저장", "pbSaveFromEst()") + '</div>' + (typeof pbDatalist === "function" ? pbDatalist() : "") + '</div>';
   // 제경비·합계
   h += '<div class="card" style="margin-bottom:10px"><strong>➕ 제경비 · 부가세 · 끝자리</strong>';
   h += '<table style="border-collapse:collapse;font-size:13px;margin-top:8px">';
   (e.ext || []).forEach(function(r, i){
     h += '<tr><td style="padding:3px">' + _estIn(r.nm, "EST_ED.ext[" + i + "].nm=this.value;_estRecalc()", "150px") + '</td>';
-    h += '<td style="padding:3px"><select onchange="EST_ED.ext[' + i + '].mode=this.value;_estRecalc()" style="padding:5px;border:1px solid #cbd5e1;border-radius:5px"><option value="pct"' + (r.mode === "pct" ? " selected" : "") + '>직접공사비의 %</option><option value="amt"' + (r.mode !== "pct" ? " selected" : "") + '>금액(원)</option></select></td>';
+    h += '<td style="padding:3px"><select onchange="EST_ED.ext[' + i + '].mode=this.value;_estRecalc()" style="padding:5px;border:1px solid #cbd5e1;border-radius:5px">' + EST_EXT_MODES.map(function(o){ return '<option value="' + o[0] + '"' + ((r.mode || "pct") === o[0] ? " selected" : "") + '>' + o[1] + '</option>'; }).join("") + '</select></td>';
     h += '<td style="padding:3px"><input inputmode="decimal" value="' + esc(r.v) + '" oninput="EST_ED.ext[' + i + '].v=this.value;_estRecalc()" style="width:110px;padding:5px;border:1px solid #cbd5e1;border-radius:5px;text-align:right"></td>';
     h += '<td style="padding:3px"><button class="btn btn-r btn-s" onclick="EST_ED.ext.splice(' + i + ',1);draw()">✕</button></td></tr>';
   });
-  h += '</table><div style="margin-top:6px">' + _estBtn("#0f766e", "+ 제경비 줄 (안전관리비·폐기물처리비 등)", "EST_ED.ext=EST_ED.ext||[];EST_ED.ext.push({nm:'',mode:'pct',v:0});draw()") + '</div>';
+  h += '</table><div style="margin-top:6px">' + _estBtn("#0f766e", "+ 제경비 줄 (안전관리비·폐기물처리비 등)", "EST_ED.ext=EST_ED.ext||[];EST_ED.ext.push({nm:'',mode:'pct',v:0});draw()") + ' ' + _estBtn("#7c4a21", "📐 원가계산 기본 줄 넣기", "estCostRows()") + '<div class="mut" style="font-size:12px;margin-top:4px">간접노무비·산재·고용보험료·안전관리비·일반관리비·이윤 줄이 들어가요. 요율(%)은 해마다 바뀌어서 비워 뒀어요 — 직접 적어 주세요.</div></div>';
   h += '<div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:13px;align-items:center">';
   h += '<label>끝자리 정리 <select onchange="EST_ED.cut=Number(this.value);_estRecalc()" style="padding:5px;border:1px solid #cbd5e1;border-radius:5px">';
   [[0, "그대로"], [100, "100원 미만 버림"], [1000, "1,000원 미만 버림"], [10000, "1만원 미만 버림"], [100000, "10만원 미만 버림"]].forEach(function(o){ h += '<option value="' + o[0] + '"' + (_estN(e.cut) === o[0] ? " selected" : "") + '>' + o[1] + '</option>'; });
@@ -214,7 +221,7 @@ function _estTotHtml(e){
   var h = '<table style="border-collapse:collapse;font-size:13.5px;margin-left:auto">';
   if(e.split) h += R("재료비", c.mat) + R("노무비", c.lab) + R("경비", c.exp);
   h += R("직접공사비", c.direct, "font-weight:700");
-  c.ext.forEach(function(r){ h += R(esc(r.nm || "제경비") + (r.mode === "pct" ? " (" + _estN(r.v) + "%)" : ""), r.am); });
+  c.ext.forEach(function(r){ h += R(esc(r.nm || "제경비") + (r.mode !== "amt" ? " (" + _estN(r.v) + "%)" : ""), r.am); });
   if(c.cutAm) h += R("끝자리 정리", c.cutAm, "color:#dc2626");
   h += R("공급가액", c.sup, "font-weight:700;border-top:1px solid #cbd5e1") + R("부가세", c.vat);
   h += '<tr><td style="padding:6px 14px 3px 0;font-weight:800">총 견적 금액</td><td style="padding:6px 0 3px;text-align:right;font-weight:800;font-size:17px;color:#1d4ed8">' + _estW(c.tot) + '원</td></tr>';
@@ -227,6 +234,12 @@ function _estRecalc(){
   var t = document.getElementById("estTot"); if(t) t.innerHTML = _estTotHtml(e);
 }
 function estClientPick(k){ var c = CLIENTS[k]; if(!c) return; EST_ED.cl = { nm: c.nm || "", ceo: c.ceo || "", biz: c.biz || "", addr: c.addr || "", tel: c.tel || "" }; draw(); toast(c.nm + " 불러왔어요"); }
+function estCostRows(){
+  var have = {}; (EST_ED.ext || []).forEach(function(r){ have[r.nm] = 1; });
+  var add = EST_COST_ROWS.filter(function(r){ return !have[r.nm]; }).map(function(r){ return Object.assign({}, r); });
+  EST_ED.ext = (EST_ED.ext || []).concat(add); draw();
+  toast(add.length ? "📐 " + add.length + "줄 넣었어요 — 요율(%)을 적어 주세요" : "이미 다 있어요");
+}
 function estSet(path, v){ var p = path.split("."); if(p.length === 2) EST_ED[p[0]][p[1]] = v; else EST_ED[p[0]] = v; }
 function estIt(i, k, v, num){ EST_ED.items[i][k] = num ? String(v).replace(/,/g, "") : v; if(num) _estRecalc(); }
 function estAdd(hd){ EST_ED.items.push(hd ? { hd: 1, nm: "" } : { nm: "", spec: "", u: "식", qty: 1, mat: 0, lab: 0, exp: 0, note: "" }); draw(); }
@@ -510,7 +523,7 @@ function estPrintQuote(id, extra){   // extra: 뒤에 붙일 쪽 (현장 사진 
   var R = function(lb, v, st){ return '<tr><th style="text-align:left;' + (st || "") + '">' + lb + '</th><td class="r" style="' + (st || "") + '">' + _estW(v) + '</td></tr>'; };
   if(e.split) b += R("재료비", c.mat) + R("노무비", c.lab) + R("경비", c.exp);
   b += R("직접공사비 계", c.direct);
-  c.ext.forEach(function(r){ b += R(esc(r.nm || "제경비") + (r.mode === "pct" ? " (" + _estN(r.v) + "%)" : ""), r.am); });
+  c.ext.forEach(function(r){ b += R(esc(r.nm || "제경비") + (r.mode !== "amt" ? " (" + _estN(r.v) + "%)" : ""), r.am); });
   if(c.cutAm) b += R("끝자리 정리", c.cutAm);
   b += R("공급가액", c.sup, "font-weight:800") + R("부가세", c.vat) + R("총 액", c.tot, "font-weight:900;font-size:14px") + '</table>';
   if(e.memo) b += '<table style="margin-top:3mm"><tr><th style="width:80px">특기사항</th><td style="white-space:pre-wrap">' + esc(e.memo) + '</td></tr></table>';
@@ -635,7 +648,7 @@ async function estQuoteExcel(id){
   var T = [];
   if(sp) T.push(["재료비", c.mat], ["노무비", c.lab], ["경비", c.exp]);
   T.push(["직접공사비 계", c.direct]);
-  c.ext.forEach(function(x){ T.push([(x.nm || "제경비") + (x.mode === "pct" ? " (" + _estN(x.v) + "%)" : ""), x.am]); });
+  c.ext.forEach(function(x){ T.push([(x.nm || "제경비") + (x.mode !== "amt" ? " (" + _estN(x.v) + "%)" : ""), x.am]); });
   if(c.cutAm) T.push(["끝자리 정리", c.cutAm]);
   T.push(["공급가액", c.sup], ["부가세", c.vat], ["총 액", c.tot]);
   T.forEach(function(t){ ws.mergeCells(r0, NC - 3, r0, NC - 1); ws.getCell(r0, NC - 3).value = t[0]; ws.getCell(r0, NC).value = t[1]; ws.getCell(r0, NC).numFmt = "#,##0";
